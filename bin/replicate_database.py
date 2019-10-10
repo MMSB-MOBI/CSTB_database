@@ -4,6 +4,9 @@ import re
 import sys
 import time
 import copy
+import sys 
+sys.path.append("/Users/chilpert/Dev/CSTB_database/lib")
+import watch as watch
 
 def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
@@ -55,6 +58,16 @@ def monitor_replication(insert_ids, sleep_time = 5):
                 print(doc["_id"], "replication job is complete.")
         time.sleep(2)    
 
+def monitorStatus(doc):
+    if "error" in doc: 
+        return "error"
+    return doc.get("state", "unknown")   
+
+def monitorStop(status):
+    if status in ["error", "crashing", "failed", "completed"]:
+        return True
+    return False
+
 if __name__ == '__main__':
     ARGS = args_gestion()
     couchDB.setServerUrl(ARGS.url)
@@ -71,13 +84,14 @@ if __name__ == '__main__':
     print("== Databases to replicate:")
     for db_name in db_names:
         print(db_name)
-
+    
     print("== Launch jobs")
     to_insert = get_replicate_doc(db_names, ARGS.url)
     couchDB.bulkDocAdd(iterable = to_insert, target = "_replicator")
 
     print("== Monitor replication")
-    monitor_replication(list(to_insert.keys()))
+    urls_to_watch = [ARGS.url + "/_scheduler/doc/_replicator/" + rep_name for rep_name in to_insert]
+    watch.launch(monitorStatus, monitorStop, *urls_to_watch)
 
     
         
