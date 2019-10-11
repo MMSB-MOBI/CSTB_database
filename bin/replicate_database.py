@@ -84,14 +84,25 @@ if __name__ == '__main__':
     print("== Databases to replicate:")
     for db_name in db_names:
         print(db_name)
+
+    confirm = input("Do you want to replicate this databases ? (y/n) ")
+    while (confirm != "y" and confirm != "n"):
+        confirm = input("I need y or n answer : ") 
+
+    if confirm == "n":
+        exit()    
     
-    print("== Launch jobs")
+    print("== Launch replication")
     to_insert = get_replicate_doc(db_names, ARGS.url)
     couchDB.bulkDocAdd(iterable = to_insert, target = "_replicator")
 
     print("== Monitor replication")
-    urls_to_watch = [ARGS.url + "/_scheduler/doc/_replicator/" + rep_name for rep_name in to_insert]
-    watch.launch(monitorStatus, monitorStop, *urls_to_watch)
+    repIDs = [rep_name for rep_name in to_insert]
+    watch.setServerURL(ARGS.url)
+    if (ARGS.db):
+        watch.setLogStatus(ARGS.db + "_status.log")
+        watch.setLogRunning(ARGS.db + "_running.log")
+    watch.launch(monitorStatus, monitorStop, *repIDs)
 
     
         
