@@ -44,7 +44,17 @@ def setLogRunning(path):
     global LOG_RUNNING
     LOG_RUNNING = path   
 
-async def watch_status(filePath, fStatus, fStop) -> str:
+def replicationStatus(doc):
+    if "error" in doc: 
+        return "error"
+    return doc.get("state", "unknown")
+
+def monitorStop(status):
+    if status in ["error", "crashing", "failed", "completed"]:
+        return True
+    return False
+
+async def watch_status(filePath) -> str:
     #print("WATCH")
     global DEFAULT_END_POINT
     global HANDLE_STATUS
@@ -53,7 +63,7 @@ async def watch_status(filePath, fStatus, fStop) -> str:
     r = SESSION.get(urlToWatch)
 
     doc = json.loads(r.text)
-    status = fStatus(doc)
+    status = replicationStatus(doc)
 
     to_write = "####" + filePath + " " + time.strftime("%d-%m-%Y/%H:%M:%S") + " " + status + "\n"
     to_write += r.text
@@ -61,18 +71,18 @@ async def watch_status(filePath, fStatus, fStop) -> str:
 
     last_md5 = hashlib.md5(r.text.encode()).hexdigest()
     
-    if fStop(status):
+    if monitorStop(status):
         return
 
     while(True):
         r = SESSION.get(urlToWatch)
         new_md5 = hashlib.md5(r.text.encode()).hexdigest()
         if new_md5 != last_md5:
-            status = fStatus(json.loads(r.text))
+            status = replicationStatus(json.loads(r.text))
             to_write = "####" + filePath + " CHANGE " + time.strftime("%d-%m-%Y/%H:%M:%S") + " " + status + "\n"
             to_write += r.text
             writeStatus(to_write)
-            if fStop(status):
+            if monitorStop(status):
                 return
             last_md5 = new_md5
         await asyncio.sleep(2)  
@@ -98,6 +108,8 @@ async def watch_advancement(repID, all_docs, target):
 
 async def get_source_and_target(rep_id):
     dic_ret = {rep_id: {}}
+    print("OOOOO")
+    print(DEFAULT_END_POINT)
     r = SESSION.get(DEFAULT_END_POINT + "/_replicator/" + rep_id)
     doc = json.loads(r.text)
     if "error" in doc:
@@ -111,19 +123,19 @@ async def get_source_and_target(rep_id):
     dic_ret[rep_id]["source"] = str(nb_doc)
     return dic_ret
 
-async def main(fStatus, fStop, *filePath : str) -> None:
+async def main(*filePath : str) -> None:
     #print("MAIN")
     ret = await asyncio.gather(*[ get_source_and_target(f) for f in filePath ])
     source_target_dic = {k: v for dic in ret for k, v in dic.items()}
-    await asyncio.gather(*[ watch_status(f, fStatus, fStop) for f in filePath ], *[ watch_advancement(f, source_target_dic[f]["source"], source_target_dic[f]["target"]) for f in filePath])
+    await asyncio.gather(*[ watch_status(f) for f in filePath ], *[ watch_advancement(f, source_target_dic[f]["source"], source_target_dic[f]["target"]) for f in filePath])
 
 
-def launch(fStatus, fStop, *repIDs):
+def launch(*repIDs):
     #source_target_dic = asyncio.run(run_source_target(*repIDs))
     initialize_log()
     print("Follow replication states in", LOG_STATUS)
     print("Follow replication advancement in", LOG_RUNNING)
-    asyncio.run(main(fStatus, fStop, *repIDs))
+    asyncio.run(main(*repIDs))
     print("DONE")
 #    fileToWatch = sys.argv[1:]
 #    asyncio.run(main(*fileToWatch))

@@ -58,16 +58,6 @@ def monitor_replication(insert_ids, sleep_time = 5):
                 print(doc["_id"], "replication job is complete.")
         time.sleep(2)    
 
-def monitorStatus(doc):
-    if "error" in doc: 
-        return "error"
-    return doc.get("state", "unknown")   
-
-def monitorStop(status):
-    if status in ["error", "crashing", "failed", "completed"]:
-        return True
-    return False
-
 if __name__ == '__main__':
     ARGS = args_gestion()
     couchDB.setServerUrl(ARGS.url)
@@ -102,7 +92,7 @@ if __name__ == '__main__':
     if (ARGS.db):
         watch.setLogStatus(ARGS.db + "_status.log")
         watch.setLogRunning(ARGS.db + "_running.log")
-    watch.launch(monitorStatus, monitorStop, *repIDs)
+    watch.launch(*repIDs)
 
     
         
