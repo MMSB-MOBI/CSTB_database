@@ -8,7 +8,6 @@ import os
 import argparse
 import requests
 import sys
-sys.path.append("/Users/chilpert/Dev/crispr/lib")
 import maxi_tree as mt
 
 

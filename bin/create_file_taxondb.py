@@ -21,6 +21,7 @@ import display_result as dspl
 from Bio import SeqIO
 
 
+
 def args_gestion():
     """
     Take and treat arguments that user gives in command line
@@ -150,7 +151,7 @@ def check_connexion(end_point):
     try:
         res = req_func.get(end_point + "handshake").json()
         dspl.eprint("HANDSHAKE PACKET (tree_db) : {}".format(res))
-        return req_func
+        return req_func    
     except Exception as e:
         dspl.eprint("Could not perform handshake, exiting")
         print("Program terminated&No handshake with taxon database")
@@ -171,6 +172,9 @@ if __name__ == '__main__':
         TAXON_DT = {}
         req_func = check_connexion(PARAM.r)
         DOC = req_func.post(PARAM.r + PARAM.dbName, json={"keys": [PARAM.taxid]}).json()["request"]
+        if DOC and not DOC[PARAM.taxid]:
+            DOC = None
+      
         LIST_GCF = [PARAM.gcf] + DOC[PARAM.taxid]["GCF"] if DOC else [PARAM.gcf]
         tmp_taxon_dt = init_taxondt(LIST_GCF, PARAM.user, PARAM.taxid, PARAM.fasta, PARAM.gcf)
         if(tmp_taxon_dt != 1): TAXON_DT[PARAM.taxid] = tmp_taxon_dt

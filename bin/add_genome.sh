@@ -1,12 +1,16 @@
 set -e
 
 function usage(){
-    echo 'usage : add_genome.sh -f <str>
+    echo "usage : add_genome.sh -f=<path> --taxid=<int>|--taxname=<str> --id=<str> [-o=<path>]
 	[OPTIONS]
 	-h : print help
-	-f <str> : path to fasta genome to add in database
-    -o <str> : output directory to write files to insert (default : .)
-    -n <str> : genome name that you want to display in tree' 
+	-f=<path> : path to fasta genome to add in database
+    -o=<path> : output directory to write files to insert (default : .)
+    --taxid=<int> : ncbi taxid (you can't combine --taxid and --taxname)
+    --taxname=<str> : taxon name you want to give (you can't combine --taxid and --taxname)
+    --id=<str> : genome identifiant (for example, GCF_xxxxxxx for Refseq genome)
+    --force : overwrite results if already exists
+    "
 }
 
 function args_gestion(){
@@ -17,9 +21,19 @@ function args_gestion(){
     if [[ ! $OUTDIR ]]; then
         OUTDIR=.
     fi
-    if [[ ! $NAME ]]; then
+    if [[ ! $TAXID  && ! $TAXNAME ]]; then
         quit=1
-        echo "-n is mandatory. Give genome name."
+        echo "--taxid or --taxname is mandatory. Give taxon taxid/name."
+    fi
+
+    if [[ $TAXID && $TAXNAME ]]; then
+        quit=1
+        echo "--taxid and --taxname are not compatible. Choose one."
+    fi
+
+    if [[ ! $GENOME_ID ]]; then
+        quit=1
+        echo "--id is mandatory. Give genome id."
     fi
 
     if [[ $quit ]]; then
@@ -38,21 +52,40 @@ function args_verif(){
     fi
 }
 
-while getopts "f:ho:n:" option; do 
-    case $option in
-        f)
-            FASTA=$OPTARG
-            ;;
-        o)
-            OUTDIR=$OPTARG
-            ;;
-        n)
-            NAME=$OPTARG
-            ;;
-        h)
+
+while [ "$1" != "" ]; do
+    PARAM=`echo $1 | awk -F= '{print $1}'`
+    VALUE=`echo $1 | awk -F= '{print $2}'`
+    case $PARAM in
+        -h | --help)
             usage
+            exit
             ;;
-    esac         
+        -f)
+            FASTA=$VALUE
+            ;;
+        -o)
+            OUTDIR=$VALUE
+            ;;
+        --taxid)
+            TAXID=$VALUE
+            ;;    
+        --taxname)
+            TAXNAME=$VALUE
+            ;;    
+        --id)
+            GENOME_ID=$VALUE
+            ;;
+        --force)
+            FORCE=1
+            ;;
+        *)
+            echo "ERROR: unknown parameter \"$PARAM\""
+            usage
+            exit 1
+            ;;
+    esac
+    shift
 done
 
 args_gestion
@@ -70,8 +103,18 @@ BIN=$tool_dir/bin
 echo "== Search sgRNA, indexing genome"
 mkdir -p $OUTDIR/genome_pickle
 mkdir -p $OUTDIR/genome_index
-echo Launch python $BIN/create_metafile.py -file "$FASTA" -out "$NAME" -rfg "$OUTDIR"
-python $BIN/create_metafile.py -file "$FASTA" -out "$NAME" -rfg "$OUTDIR"
+if [[ -f $OUTDIR/genome_index/$NAME.index && $OUTDIR/genome_pickle/$NAME.p && ! $FORCE ]]; then
+    echo "$NAME.index and $NAME.p already exists. Use --force to overwrite"
+else
+    if [[ $TAXID ]]; then 
+        echo Launch python $BIN/create_metafile.py -file "$FASTA" -rfg "$OUTDIR" -taxid "$TAXID" -gcf "$GENOME_ID"
+        python $BIN/create_metafile.py -file "$FASTA" -rfg "$OUTDIR" -taxid "$TAXID" -gcf "$GENOME_ID"
+    elif [[ $TAXNAME ]]; then
+        echo Launch python $BIN/create_metafile.py -file "$FASTA" -rfg "$OUTDIR" -taxname "$TAXNAME" -gcf "$GENOME_ID"
+    fi
+fi
+
+exit
 
 echo "== Add to taxon_db"
 echo Launch python $BIN/create_file_taxon_db.py single -r 
