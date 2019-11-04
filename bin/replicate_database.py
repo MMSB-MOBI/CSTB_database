@@ -5,8 +5,8 @@ import sys
 import time
 import copy
 import sys 
-sys.path.append("/Users/chilpert/Dev/CSTB_database/lib")
-import watch as watch
+#sys.path.append("/Users/chilpert/Dev/CSTB_database/lib")
+#import watch as watch
 
 def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
@@ -86,13 +86,13 @@ if __name__ == '__main__':
     to_insert = get_replicate_doc(db_names, ARGS.url)
     couchDB.bulkDocAdd(iterable = to_insert, target = "_replicator")
 
-    print("== Monitor replication")
-    repIDs = [rep_name for rep_name in to_insert]
-    watch.setServerURL(ARGS.url)
-    if (ARGS.db):
-        watch.setLogStatus(ARGS.db + "_status.log")
-        watch.setLogRunning(ARGS.db + "_running.log")
-    watch.launch(*repIDs)
+    #print("== Monitor replication")
+    #repIDs = [rep_name for rep_name in to_insert]
+    #watch.setServerURL(ARGS.url)
+    #if (ARGS.db):
+    #    watch.setLogStatus(ARGS.db + "_status.log")
+    #    watch.setLogRunning(ARGS.db + "_running.log")
+    #watch.launch(*repIDs)
 
     
         
