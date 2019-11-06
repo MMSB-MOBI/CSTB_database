@@ -16,6 +16,8 @@ DEFAULT_END_POINT = "http://localhost:5984"
 LOG_STATUS = "./monitor_status.log"
 LOG_RUNNING = "./monitor_running.log"
 
+NB_TRY = 0
+
 # https://stackoverflow.com/questions/3173320/text-progress-bar-in-the-console
 
 def initialize_log():
@@ -108,8 +110,6 @@ async def watch_advancement(repID, all_docs, target):
 
 async def get_source_and_target(rep_id):
     dic_ret = {rep_id: {}}
-    print("OOOOO")
-    print(DEFAULT_END_POINT)
     r = SESSION.get(DEFAULT_END_POINT + "/_replicator/" + rep_id)
     doc = json.loads(r.text)
     if "error" in doc:
@@ -128,6 +128,21 @@ async def main(*filePath : str) -> None:
     ret = await asyncio.gather(*[ get_source_and_target(f) for f in filePath ])
     source_target_dic = {k: v for dic in ret for k, v in dic.items()}
     await asyncio.gather(*[ watch_status(f) for f in filePath ], *[ watch_advancement(f, source_target_dic[f]["source"], source_target_dic[f]["target"]) for f in filePath])
+        
+def launch_watching(*repIDs):
+    global NB_TRY
+    try:
+        asyncio.run(main(*repIDs))
+        return "Done"
+    except Exception as e:
+        NB_TRY += 1 
+        if NB_TRY == 500: 
+            print("Retry 500 times")
+            print(e)
+            NB_TRY = 0
+            return
+        launch_watching(*repIDs)
+        return "Fail"
 
 
 def launch(*repIDs):
@@ -135,7 +150,11 @@ def launch(*repIDs):
     initialize_log()
     print("Follow replication states in", LOG_STATUS)
     print("Follow replication advancement in", LOG_RUNNING)
-    asyncio.run(main(*repIDs))
-    print("DONE")
+    return launch_watching(*repIDs)
 #    fileToWatch = sys.argv[1:]
 #    asyncio.run(main(*fileToWatch))
+
+def finish_watching(status):
+    global NB_TRY
+    NB_TRY = 0 
+    return status

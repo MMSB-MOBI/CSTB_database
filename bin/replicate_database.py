@@ -5,8 +5,8 @@ import sys
 import time
 import copy
 import sys 
-#sys.path.append("/Users/chilpert/Dev/CSTB_database/lib")
-#import watch as watch
+sys.path.append("/home/chilpert/Dev/CSTB_database/lib")
+import watch as watch
 
 def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
@@ -16,6 +16,7 @@ def args_gestion():
     parser.add_argument("--db", metavar="<str>", help = "Replicate database(s) corresponding to this regular expression")
     parser.add_argument("--all", help = "Replicate all databases in couchDB", action="store_true")
     parser.add_argument("--url", metavar="<str>", help = "couchDB endpoint", required = True)
+    parser.add_argument("--bulk", metavar="<int>", help = "Number of replication to launch simultanously (default: 2)", default=2)
 
     args = parser.parse_args()
     if args.db and args.all:
@@ -58,6 +59,27 @@ def monitor_replication(insert_ids, sleep_time = 5):
                 print(doc["_id"], "replication job is complete.")
         time.sleep(2)    
 
+def create_bulks(db_names, bulk_size):
+    bulks = [db_names[x:x+bulk_size] for x in range(0, len(db_names), bulk_size)]
+    return bulks
+
+def replication(databases):
+    print("I replicate", databases)    
+    to_insert = get_replicate_doc(databases, ARGS.url)
+    couchDB.bulkDocAdd(iterable = to_insert, target = "_replicator")
+
+    repIDs = [rep_name for rep_name in to_insert]
+
+    print("I start monitor")
+    watch_status = watch.launch(*repIDs)
+
+    if watch_status == "Done":
+        print("I finish replicate", databases)
+
+    elif watch_status == "Fail":
+        print("I fail replicate", databases)   
+    return
+
 if __name__ == '__main__':
     ARGS = args_gestion()
     couchDB.setServerUrl(ARGS.url)
@@ -80,7 +102,19 @@ if __name__ == '__main__':
         confirm = input("I need y or n answer : ") 
 
     if confirm == "n":
-        exit()    
+        exit()   
+
+    bulks = create_bulks(db_names, ARGS.bulk)
+
+    watch.setServerURL(ARGS.url)
+    
+    nb_bulk = 0
+    for bulk in bulks[:2]:
+        nb_bulk += 1
+        watch.setLogStatus("replicate_bulk" + str(nb_bulk)+ "_status.log")
+        watch.setLogRunning("replicate_bulk" + str(nb_bulk)+ "_running.log")
+        replication(bulk)
+    exit()    
     
     print("== Launch replication")
     to_insert = get_replicate_doc(db_names, ARGS.url)
