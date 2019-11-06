@@ -5,8 +5,15 @@ import sys
 import time
 import copy
 import sys 
+import os
+import requests
+import json
 sys.path.append("/home/chilpert/Dev/CSTB_database/lib")
 import watch as watch
+
+SESSION = requests.session()
+SESSION.trust_env = False
+FAILED = []
 
 def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
@@ -63,7 +70,25 @@ def create_bulks(db_names, bulk_size):
     bulks = [db_names[x:x+bulk_size] for x in range(0, len(db_names), bulk_size)]
     return bulks
 
+def delete_replication_doc(*repIDs):
+    global ARGS
+    for rep in repIDs:
+        doc_url = ARGS.url + "/_replicator/" + rep
+        rev_id = json.loads(SESSION.get(doc_url).text)["_rev"]
+        print("Delete " + rep + " replication document...")
+        res = SESSION.delete(doc_url + "?rev=" + rev_id)
+        print(res.text)
+
+def delete_databases(repIDs):
+    for rep in repIDs:
+        target = rep.lstrip("rep_")
+        print("Delete failed " + target + "...")
+        print(ARGS.url + "/" + target)
+        res = SESSION.delete(ARGS.url + "/" + target)
+        print(res.text)
+
 def replication(databases):
+    global FAILED
     print("I replicate", databases)    
     to_insert = get_replicate_doc(databases, ARGS.url)
     couchDB.bulkDocAdd(iterable = to_insert, target = "_replicator")
@@ -77,10 +102,12 @@ def replication(databases):
         print("I finish replicate", databases)
 
     elif watch_status == "Fail":
-        print("I fail replicate", databases)   
-    return
+        print("I fail replicate", databases) 
+        delete_replication_doc(*repIDs)  
+        FAILED += repIDs
 
 if __name__ == '__main__':
+    global ARGS
     ARGS = args_gestion()
     couchDB.setServerUrl(ARGS.url)
     couchDB.couchPing()
@@ -109,11 +136,18 @@ if __name__ == '__main__':
     watch.setServerURL(ARGS.url)
     
     nb_bulk = 0
-    for bulk in bulks[:2]:
+    for bulk in bulks:
         nb_bulk += 1
         watch.setLogStatus("replicate_bulk" + str(nb_bulk)+ "_status.log")
         watch.setLogRunning("replicate_bulk" + str(nb_bulk)+ "_running.log")
         replication(bulk)
+
+    if FAILED:
+        print("== Failed", FAILED)
+        print("Don't forget to delete newly created failed databases")
+    else:
+        print("== All databases successfully replicated")
+
     exit()    
     
     print("== Launch replication")
