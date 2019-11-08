@@ -14,6 +14,7 @@ import watch as watch
 SESSION = requests.session()
 SESSION.trust_env = False
 FAILED = []
+TIMESTAMP = time.strftime("%Y%m%d-%H%M%S")
 
 def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
@@ -40,10 +41,9 @@ def get_database_names():
     return db_names
 
 def get_replicate_doc(db_names, url):
-    timestamp = time.strftime("%Y%m%d-%H%M%S")
     docs = {}
     for name in db_names:
-        target = name + "-bak" + timestamp
+        target = name + "-bak" + TIMESTAMP
         rep_id = "rep_" + target
         docs[rep_id] = {"source": url + "/" + name, "target" : url + "/" + target, "create_target": True, "continuous": False}
     return docs
@@ -79,11 +79,13 @@ def delete_replication_doc(*repIDs):
         res = SESSION.delete(doc_url + "?rev=" + rev_id)
         print(res.text)
 
-def delete_databases(repIDs):
+def delete_databases(*repIDs):
     for rep in repIDs:
         target = rep.lstrip("rep_")
-        print("Delete failed " + target + "...")
-        print(ARGS.url + "/" + target)
+        res_json = json.loads(SESSION.get(ARGS.url + "/" + target).text)
+        if "error" in res_json and res_json["error"] == "not_found":
+            continue
+        print("Delete " + target + "...")
         res = SESSION.delete(ARGS.url + "/" + target)
         print(res.text)
 
@@ -96,15 +98,22 @@ def replication(databases):
     repIDs = [rep_name for rep_name in to_insert]
 
     print("I start monitor")
-    watch_status = watch.launch(*repIDs)
-
-    if watch_status == "Done":
-        print("I finish replicate", databases)
-
-    elif watch_status == "Fail":
-        print("I fail replicate", databases) 
-        delete_replication_doc(*repIDs)  
+    try:
+        watch_failed = watch.launch(*repIDs)
+    except KeyboardInterrupt:
+        print("KeyboardInterrupt")
+        delete_replication_doc(*repIDs)
         FAILED += repIDs
+        return
+        
+    FAILED = watch_failed
+
+    for rep in repIDs:
+        if rep in FAILED:
+            print("I fail replicate", rep)
+            
+        else:
+            print("I finish replicate", rep)
 
 if __name__ == '__main__':
     global ARGS
@@ -138,9 +147,10 @@ if __name__ == '__main__':
     nb_bulk = 0
     for bulk in bulks:
         nb_bulk += 1
-        watch.setLogStatus("replicate_bulk" + str(nb_bulk)+ "_status.log")
-        watch.setLogRunning("replicate_bulk" + str(nb_bulk)+ "_running.log")
+        watch.setLogStatus(TIMESTAMP + "_replicate_bulk" + str(nb_bulk)+ "_status.log")
+        watch.setLogRunning(TIMESTAMP + "_replicate_bulk" + str(nb_bulk)+ "_running.log")
         replication(bulk)
+        print()
 
     if FAILED:
         print("== Failed", FAILED)
@@ -153,6 +163,7 @@ if __name__ == '__main__':
     print("== Launch replication")
     to_insert = get_replicate_doc(db_names, ARGS.url)
     couchDB.bulkDocAdd(iterable = to_insert, target = "_replicator")
+
 
     #print("== Monitor replication")
     #repIDs = [rep_name for rep_name in to_insert]
