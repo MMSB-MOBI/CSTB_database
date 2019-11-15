@@ -70,11 +70,6 @@ async def watch_status(filePath, nb_try=0) -> str:
     global FAILED
 
     try:
-        if "crispr_rc01_v2" in filePath:
-            raise Exception("v2")
-        if "crispr_rc01_v3" in filePath and nb_try == 0:
-            raise Exception("v3")
-
         urlToWatch = DEFAULT_END_POINT + "/_scheduler/docs/_replicator/" + filePath
         r = SESSION.get(urlToWatch)
 
@@ -126,12 +121,6 @@ async def watch_advancement(repID, all_docs, target, nb_try = 0):
     global FAILED
 
     try:
-        if "crispr_rc01_v4" in repID:
-            raise Exception("v4")
-
-        if "crispr_rc01_v6" in repID and nb_try in [0,1] :
-            raise Exception("v6")     
-
         doc = json.loads(SESSION.get(target).text)
         
         nb_replicate = str(doc.get("doc_count", 0))
@@ -167,8 +156,6 @@ async def watch_advancement(repID, all_docs, target, nb_try = 0):
 async def get_source_and_target(rep_id):
     global FAILED
     try:
-        if "crispr_rc01_v0" in rep_id:
-            raise Exception("v0")
         dic_ret = {rep_id: {}}
         r = SESSION.get(DEFAULT_END_POINT + "/_replicator/" + rep_id)
         doc = json.loads(r.text)
