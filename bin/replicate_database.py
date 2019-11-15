@@ -34,6 +34,7 @@ def args_gestion():
         print("You have to give --all or --db argument")
         exit()
     args.url = args.url.rstrip("/")
+    args.bulk = int(args.bulk)
     return args    
 
 def get_database_names():
