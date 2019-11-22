@@ -1,6 +1,10 @@
 # CSTB_database
 Scripts to manage CSTB database
 
+## Check database consistency 
+
+...
+
 ## Replicate database
 Need pyCouch module  
 Use `replicate_database.py` script :
@@ -27,6 +31,11 @@ python replicate_database.py --url http://localhost:5984 --db taxon_tree
 ```
 * Replicate all crispr_rc01 databases
 ```
-python replicate_database.py --url http://localhost:5984 --db crispr_rc01_v*
+python replicate_database.py --url http://localhost:5984 --db crispr_rc01_v[0-9]+
 ```
+
+## Add genome 
+
+...
+
 
