@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Load the MaxiTree object from the taxon_tree_db and insert a new member.
+Create the MaxiTree object from taxon_db
 Then, create a pickle file to insert it into the database
 """
 
