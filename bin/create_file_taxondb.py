@@ -19,6 +19,7 @@ import csv
 import requests
 import display_result as dspl
 from Bio import SeqIO
+from ete3 import NCBITaxa
 
 
 
@@ -58,7 +59,8 @@ def args_gestion():
                                help="The name of the outputfile", default="taxon_dt.p")
     single_parser.add_argument("-fasta", metavar="<str>", required=True,
                                 help="Path of the fasta file")
-
+    single_parser.add_argument("-outdir", metavar="<path>",
+                                help="Path of the output directory", default=".")                
     return parser.parse_args(), command
 
 
@@ -87,10 +89,11 @@ def size_fasta(fasta_file):
     return tmp
 
 
-def init_taxondt(gcfs, user, taxon_id, fasta_path, gcf_given):
+def init_taxondt(gcfs, user, taxon_id, fasta_path, gcf_given, names):
     """
     Initialize the dictionary of taxon and return it
     """
+
     tmp_dic = {}
     tmp_dic["size"] = size_fasta(fasta_path)
     
@@ -99,6 +102,8 @@ def init_taxondt(gcfs, user, taxon_id, fasta_path, gcf_given):
     tmp_dic["date"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
     tmp_dic["user"] = user
     tmp_dic["current"] = gcfs[0]
+    tmp_dic["names"] = names
+    tmp_dic["current_name"] = names[0]
     return tmp_dic
 
 
@@ -160,7 +165,8 @@ def check_connexion(end_point):
 
 if __name__ == '__main__':
     PARAM, COMMAND = args_gestion()
-
+    OUTDIR = PARAM.outdir.rstrip("/") + "/taxonDB_data"
+    
     # Insert from SCRATCH
     if COMMAND == "scratch":
         set_env(PARAM.file)
@@ -168,7 +174,11 @@ if __name__ == '__main__':
 
     # Insert for a SINGLE genome
     else:
-        set_env()
+        #set_env()
+        try:
+            os.mkdir(OUTDIR)
+        except OSError:
+            print("Be careful : The directory taxonDB_data exists")
         TAXON_DT = {}
         req_func = check_connexion(PARAM.r)
         DOC = req_func.post(PARAM.r + PARAM.dbName, json={"keys": [PARAM.taxid]}).json()["request"]
@@ -176,7 +186,20 @@ if __name__ == '__main__':
             DOC = None
       
         LIST_GCF = [PARAM.gcf] + DOC[PARAM.taxid]["GCF"] if DOC else [PARAM.gcf]
-        tmp_taxon_dt = init_taxondt(LIST_GCF, PARAM.user, PARAM.taxid, PARAM.fasta, PARAM.gcf)
-        if(tmp_taxon_dt != 1): TAXON_DT[PARAM.taxid] = tmp_taxon_dt
 
-    pickle.dump(TAXON_DT, open("./taxonDB_data/" + PARAM.out, "wb"), protocol=3)
+        ncbi = NCBITaxa()
+        
+        name = ncbi.get_taxid_translator([int(PARAM.taxid)])
+        if not name:
+            raise Exception("No correspondance for " + PARAM.taxid + " in ete3 NCBITaxa")
+
+        name = name[int(PARAM.taxid)]
+
+        LIST_NAME = [name] + DOC[PARAM.taxid]["names"] if DOC else [name]
+
+        tmp_taxon_dt = init_taxondt(LIST_GCF, PARAM.user, PARAM.taxid, PARAM.fasta, PARAM.gcf, LIST_NAME)
+        if(tmp_taxon_dt != 1): 
+            TAXON_DT[PARAM.taxid] = tmp_taxon_dt
+
+    
+    pickle.dump(TAXON_DT, open(OUTDIR + "/" + PARAM.out, "wb"), protocol=3)
