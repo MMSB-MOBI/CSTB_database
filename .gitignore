@@ -2,3 +2,5 @@ work/*
 *.log
 tests
 tmp.*
+debug/*
+__pycache__
