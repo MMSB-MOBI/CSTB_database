@@ -12,8 +12,6 @@ function usage(){
     --taxonDB_name=<str> : taxon_db database name (default : taxon_db)
     --db_url=<url> : database url (default : http://localhost:5984)
     --taxonTree_DBname : taxon_tree database name (default : taxon_tree)
-    --slurm : Use slurm (True/False) (default : False)
-    --slurm_array_dir : directory with script for slurm arrays (default : /mobi/group/databases/crispr/crispr_rc01)
     "
 }
 
@@ -52,14 +50,6 @@ function args_gestion(){
         TREE_DB_NAME="taxon_tree"
     fi
 
-    if [[ ! $SLURM ]]; then
-        SLURM="False"
-    fi
-
-    if [[ $SLURM && ! $SLURM_ARRAY ]]; then
-        SLURM_ARRAY="/mobi/group/databases/crispr/crispr_rc01"
-    fi
-
     if [[ $quit ]]; then
         usage
         exit 1
@@ -71,11 +61,6 @@ function args_verif(){
         echo "$FASTA doesn't exist"
         exit 1
     fi
-    if [[ $SLURM -ne "False" && $SLURM -ne "True" ]]; then
-        echo "--slurm must be True or False"
-        exit
-    fi
-
     if [[ ! -d $OUTDIR ]]; then
         mkdir -p $OUTDIR
     fi
@@ -114,9 +99,6 @@ while [ "$1" != "" ]; do
             ;;
         --taxonTree_DBname)
             TREE_DB_NAME=$VALUE
-            ;;
-        --slurm)
-            SLURM=$VALUE
             ;;
         *)
             echo "ERROR: unknown parameter \"$PARAM\""
@@ -161,19 +143,15 @@ echo Launch python $BIN/create_metafile.py -file "$FASTA" -rfg "$RESDIR" -taxid 
 python $BIN/create_metafile.py -file "$FASTA" -rfg "$RESDIR" -taxid "$TAXID" -gcf "$GENOME_ID"
 
 echo "== Add sgRNA to couchDB"
-if [[ $SLURM == "False" ]]; then
-    echo Launch python /home/chilpert/Dev/pyCouch/scripts/couchBuild.py --map /home/chilpert/app/motif-broker-2/data/3letter_prefixe_rules.json --data "$RESDIR/genome_pickle" --url "$DB_URL"
-    python /home/chilpert/Dev/pyCouch/scripts/couchBuild.py --map /home/chilpert/app/motif-broker-2/data/3letter_prefixe_rules.json --data "$RESDIR/genome_pickle" --url "$DB_URL"
-elif [[ $SLURM == "True" ]]; then
-    bash $SLURM_ARRAY/buildCouchArray.sh -i $RESDIR/genome_pickle -l $SLURM_ARRAY -u $DB_URL -m $MAP -a 0 -b 10
-fi
+echo Launch python /home/chilpert/Dev/pyCouch/scripts/couchBuild.py --map /home/chilpert/app/motif-broker-2/data/3letter_prefixe_rules.json --data "$RESDIR/genome_pickle" --url "$DB_URL"
+python /home/chilpert/Dev/pyCouch/scripts/couchBuild.py --map /home/chilpert/app/motif-broker-2/data/3letter_prefixe_rules.json --data "$RESDIR/genome_pickle" --url "$DB_URL"
 
 echo "== Copy index to arwen-dev"
 echo Launch cp $RESDIR/genome_index/* /mnt/arwen-dev/data/databases/mobi/crispr_clean/genome_index/
 cp $RESDIR/genome_index/* /mnt/arwen-dev/data/databases/mobi/crispr_clean/genome_index/
 
 echo "== Copy pickle to arwen"
-cp $RESDIR/genome_pickle/* /mnt/arwen/data/databases/mobi/crispr_clean/
+cp $RESDIR/genome_pickle/* /mnt/arwen/mobi/group/databases/crispr/crispr_rc01/pickle/
 
 echo "== Add to taxon_db"
 echo Launch python $BIN/create_file_taxondb.py single -gcf "$GENOME_ID" -taxid "$TAXID" -r "$MB_URL" -dbName "$TAXONDB_NAME" -fasta "$FASTA" -outdir "$RESDIR"
