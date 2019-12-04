@@ -34,8 +34,6 @@ python replicate_database.py --url http://localhost:5984 --db taxon_tree
 python replicate_database.py --url http://localhost:5984 --db crispr_rc01_v[0-9]+
 ```
 
-## Add genome 
-
+## Add genome
 ...
-
 
