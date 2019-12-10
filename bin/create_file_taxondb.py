@@ -184,8 +184,9 @@ if __name__ == '__main__':
         DOC = req_func.post(PARAM.r + PARAM.dbName, json={"keys": [PARAM.taxid]}).json()["request"]
         if DOC and not DOC[PARAM.taxid]:
             DOC = None
-      
-        LIST_GCF = [PARAM.gcf] + DOC[PARAM.taxid]["GCF"] if DOC else [PARAM.gcf]
+    
+
+        LIST_GCF = list(set([PARAM.gcf] + DOC[PARAM.taxid]["GCF"])) if DOC else [PARAM.gcf]
 
         ncbi = NCBITaxa()
         
@@ -195,7 +196,7 @@ if __name__ == '__main__':
 
         name = name[int(PARAM.taxid)]
 
-        LIST_NAME = [name] + DOC[PARAM.taxid]["names"] if DOC else [name]
+        LIST_NAME = list(set([name] + DOC[PARAM.taxid]["names"])) if DOC else [name]
 
         tmp_taxon_dt = init_taxondt(LIST_GCF, PARAM.user, PARAM.taxid, PARAM.fasta, PARAM.gcf, LIST_NAME)
         if(tmp_taxon_dt != 1): 
