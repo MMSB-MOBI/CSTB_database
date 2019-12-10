@@ -89,7 +89,7 @@ def size_fasta(fasta_file):
     return tmp
 
 
-def init_taxondt(gcfs, user, taxon_id, fasta_path, gcf_given, names):
+def init_taxondt(gcfs, user, taxon_id, fasta_path, gcf_given, names, name_given):
     """
     Initialize the dictionary of taxon and return it
     """
@@ -101,9 +101,9 @@ def init_taxondt(gcfs, user, taxon_id, fasta_path, gcf_given, names):
     tmp_dic["GCF"] = gcfs
     tmp_dic["date"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
     tmp_dic["user"] = user
-    tmp_dic["current"] = gcfs[0]
+    tmp_dic["current"] = gcf_given
     tmp_dic["names"] = names
-    tmp_dic["current_name"] = names[0]
+    tmp_dic["current_name"] = name_given
     return tmp_dic
 
 
@@ -198,7 +198,7 @@ if __name__ == '__main__':
 
         LIST_NAME = list(set([name] + DOC[PARAM.taxid]["names"])) if DOC else [name]
 
-        tmp_taxon_dt = init_taxondt(LIST_GCF, PARAM.user, PARAM.taxid, PARAM.fasta, PARAM.gcf, LIST_NAME)
+        tmp_taxon_dt = init_taxondt(LIST_GCF, PARAM.user, PARAM.taxid, PARAM.fasta, PARAM.gcf, LIST_NAME, name)
         if(tmp_taxon_dt != 1): 
             TAXON_DT[PARAM.taxid] = tmp_taxon_dt
 
