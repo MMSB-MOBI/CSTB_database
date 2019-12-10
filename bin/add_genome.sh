@@ -1,12 +1,12 @@
 set -e
 
 function usage(){
-    echo "usage : add_genome.sh -f <path> --taxid=<int> --id=<str>
+    echo "usage : add_genome.sh -f <path> --taxid <int>|--taxname <str> --id <str>
     [OPTIONS]
     -h : print help
     [Inputs]
     -f <path> : path to fasta genome to add in database
-    --taxid <int> : ncbi taxid
+    --taxid <int>|--taxname <str> : ncbi taxid OR taxon name
     --id <str> : genome identifiant (for example, GCF_xxxxxxx for Refseq genome)
     [Outputs]
     -o <path> : output directory to write files to insert (default : .)
@@ -16,6 +16,7 @@ function usage(){
     --taxonDB_name <str> : taxon_db database name (default : taxon_db)
     --taxonTree_name <str> : taxon_tree database name (default : taxon_tree)
     [Others]
+    --node : required with --taxname, not used with --taxid. Node name for tree. Will create the node at root and range the taxon below.
     --test : test version, database url will be http://localhost:5984 and files will not be copied to arwen and arwen-dev
     "
 }
@@ -29,9 +30,19 @@ function args_gestion(){
         OUTDIR=.
     fi
 
-    if [[ ! $TAXID ]]; then
+    if [[ ! $TAXID && ! $TAXNAME ]]; then
         quit=1
-        echo "--taxid is mandatory."
+        echo "--taxid or --taxname is mandatory."
+    fi
+
+    if [[ $TAXID && $TAXNAME ]]; then
+        quit=1
+        echo "--taxid and --taxname are uncompatible. Choose between them."
+    fi
+
+    if [[ $TAXNAME && ! $NODE ]]; then
+        quit=1
+        echo "--node is required with --taxname"
     fi
 
     if [[ ! $GENOME_ID ]]; then
@@ -88,7 +99,7 @@ function args_verif(){
     fi
 }
 
-TEMP=$(getopt -o h,o:,f: -l taxid:,id:,motif-broker-url:,db_url:,taxonDB_name:,taxonTree_name:,test -- "$@")
+TEMP=$(getopt -o h,o:,f: -l taxid:,id:,motif-broker-url:,db_url:,taxonDB_name:,taxonTree_name:,test,taxname:,node: -- "$@")
 
 eval set -- "$TEMP"
 
@@ -120,7 +131,13 @@ while true ; do
             shift 2;;
         --test)
             TEST=1
-            shift;;   
+            shift;;  
+        --taxname)
+            TAXNAME=$2
+            shift 2;;
+        --node)
+            NODE=$2
+            shift 2;;     
 		-h) 
 			usage 
 			shift ;;
@@ -168,6 +185,8 @@ done
 if [[ $cont == "n" ]]; then
     exit
 fi
+
+exit
 
 echo "== Add to taxon_db"
 echo Launch python $BIN/create_file_taxondb.py single -gcf "$GENOME_ID" -taxid "$TAXID" -r "$MB_URL" -dbName "$TAXONDB_NAME" -fasta "$FASTA" -outdir "$RESDIR"
