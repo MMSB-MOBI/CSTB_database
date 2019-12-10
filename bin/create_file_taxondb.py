@@ -20,6 +20,7 @@ import requests
 import display_result as dspl
 from Bio import SeqIO
 from ete3 import NCBITaxa
+import pycouch.wrapper_class as wrapper
 
 
 
@@ -149,19 +150,16 @@ def load_list_file(file_name, user, fasta_path):
     filin.close()
     return taxon_dt
 
-
-def check_connexion(end_point):
-    req_func = requests.Session()
-    req_func.trust_env = False
-    try:
-        res = req_func.get(end_point + "handshake").json()
-        dspl.eprint("HANDSHAKE PACKET (tree_db) : {}".format(res))
-        return req_func    
-    except Exception as e:
-        dspl.eprint("Could not perform handshake, exiting")
-        print("Program terminated&No handshake with taxon database")
-        sys.exit(1)
-
+def search_in_database(url, db, key):
+    db_wrapper = wrapper.Wrapper(url)
+    if not db_wrapper.couchPing():
+        raise Exception(f"Can't connect to database {url}")
+    
+    if not db_wrapper.couchTargetExist(db):
+        print(f"WARNING : {db} doesn't exist in {url}" )
+        return
+    
+    return db_wrapper.couchGetDoc(db, key)
 
 if __name__ == '__main__':
     PARAM, COMMAND = args_gestion()
@@ -180,13 +178,13 @@ if __name__ == '__main__':
         except OSError:
             print("Be careful : The directory taxonDB_data exists")
         TAXON_DT = {}
-        req_func = check_connexion(PARAM.r)
-        DOC = req_func.post(PARAM.r + PARAM.dbName, json={"keys": [PARAM.taxid]}).json()["request"]
-        if DOC and not DOC[PARAM.taxid]:
+
+        DOC = search_in_database(PARAM.r, PARAM.dbName, PARAM.taxid)
+        
+        if DOC and DOC["_id"] != PARAM.taxid:
             DOC = None
     
-
-        LIST_GCF = list(set([PARAM.gcf] + DOC[PARAM.taxid]["GCF"])) if DOC else [PARAM.gcf]
+        LIST_GCF = list(set([PARAM.gcf] + DOC["GCF"])) if DOC else [PARAM.gcf]
 
         ncbi = NCBITaxa()
         
@@ -196,7 +194,7 @@ if __name__ == '__main__':
 
         name = name[int(PARAM.taxid)]
 
-        LIST_NAME = list(set([name] + DOC[PARAM.taxid]["names"])) if DOC else [name]
+        LIST_NAME = list(set([name] + DOC["names"])) if DOC else [name]
 
         tmp_taxon_dt = init_taxondt(LIST_GCF, PARAM.user, PARAM.taxid, PARAM.fasta, PARAM.gcf, LIST_NAME, name)
         if(tmp_taxon_dt != 1): 
