@@ -1,0 +1,6 @@
+{
+    "^[ACGT]{3}[A][ACGT]{19}$": "organisms1",
+    "^[ACGT]{3}[C][ACGT]{19}$": "organisms2",
+    "^[ACGT]{3}[G][ACGT]{19}$": "organisms3",
+    "^[ACGT]{3}[T][ACGT]{19}$": "organisms4"
+}
