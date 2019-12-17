@@ -11,12 +11,10 @@ function usage(){
     [Outputs]
     -o <path> : output directory to write files to insert (default : .)
     [Databases]
-    --motif-broker-url <url> : motif broker listening url (defaut : http://localhost:3282)
     --db_url <url> : database url (default : http://localhost:1234)
     --taxonDB_name <str> : taxon_db database name (default : taxon_db)
     --taxonTree_name <str> : taxon_tree database name (default : taxon_tree)
     [Others]
-    --node : required with --taxname, not used with --taxid. Node name for tree. Will create the node at root and range the taxon below.
     --test : test version, database url will be http://localhost:5984 and files will not be copied to arwen and arwen-dev
     "
 }
@@ -38,11 +36,6 @@ function args_gestion(){
     if [[ $TAXID && $TAXNAME ]]; then
         quit=1
         echo "--taxid and --taxname are uncompatible. Choose between them."
-    fi
-
-    if [[ $TAXNAME && ! $NODE ]]; then
-        quit=1
-        echo "--node is required with --taxname"
     fi
 
     if [[ ! $GENOME_ID ]]; then
@@ -85,17 +78,17 @@ function args_verif(){
         mkdir -p $OUTDIR
     fi
 
-    #Verif arwen-dev is mount
+    #Verif server are mount
     if [[ ! $TEST ]]; then
         if [[ ! $(ls /mnt/arwen-dev) ]]; then
             echo "arwen-dev is not mount"
             exit
         fi
+    fi
 
-        if [[ ! $(ls /mnt/arwen) ]]; then
+    if [[ ! $(ls /mnt/arwen) ]]; then
             echo "arwen is not mount"
             exit
-        fi
     fi
 }
 
@@ -117,9 +110,6 @@ while true ; do
         --id)
             GENOME_ID=$2
             shift 2;;
-        --motif-broker-url)
-            MB_URL=$2
-            shift 2;; 
         --taxonDB_name)
             TAXONDB_NAME=$2
             shift 2;;
@@ -134,10 +124,7 @@ while true ; do
             shift;;  
         --taxname)
             TAXNAME=$2
-            shift 2;;
-        --node)
-            NODE=$2
-            shift 2;;     
+            shift 2;;  
 		-h) 
 			usage 
 			shift ;;
@@ -169,7 +156,6 @@ Output directory : $RESDIR
 Database url : $DB_URL
 Taxon database name : $TAXONDB_NAME
 Taxon tree database name : $TREE_DB_NAME
-motif-broker end point : $MB_URL 
 "
 if [[ $TEST ]];then
     echo "TEST VERSION"
@@ -186,17 +172,24 @@ if [[ $cont == "n" ]]; then
     exit
 fi
 
-exit
 
-echo "== Add to taxon_db"
-echo Launch python $BIN/create_file_taxondb.py single -gcf "$GENOME_ID" -taxid "$TAXID" -r "$MB_URL" -dbName "$TAXONDB_NAME" -fasta "$FASTA" -outdir "$RESDIR"
-python $BIN/create_file_taxondb.py single -gcf "$GENOME_ID" -taxid "$TAXID" -r "$MB_URL" -dbName "$TAXONDB_NAME" -fasta "$FASTA" -outdir "$RESDIR"
-
-echo "== Search sgRNA, indexing genome"
 mkdir -p $RESDIR/genome_pickle
 mkdir -p $RESDIR/genome_index
-echo Launch python $BIN/create_metafile.py -file "$FASTA" -rfg "$RESDIR" -taxid "$TAXID" -gcf "$GENOME_ID"
-python $BIN/create_metafile.py -file "$FASTA" -rfg "$RESDIR" -taxid "$TAXID" -gcf "$GENOME_ID"
+if [[ $TAXID ]]; then
+    echo "== Add to taxon_db"
+    echo Launch python $BIN/create_file_taxondb.py single -gcf "$GENOME_ID" -taxid "$TAXID" -r "$DB_URL" -dbName "$TAXONDB_NAME" -fasta "$FASTA" -outdir "$RESDIR"
+    python $BIN/create_file_taxondb.py single -gcf "$GENOME_ID" -taxid "$TAXID" -r "$DB_URL" -dbName "$TAXONDB_NAME" -fasta "$FASTA" -outdir "$RESDIR"
+    echo "== Search sgRNA, indexing genome"
+    echo Launch python $BIN/create_metafile.py -file "$FASTA" -rfg "$RESDIR" -taxid "$TAXID" -gcf "$GENOME_ID"
+    python $BIN/create_metafile.py -file "$FASTA" -rfg "$RESDIR" -taxid "$TAXID" -gcf "$GENOME_ID"
+elif [[ $TAXNAME ]]; then
+    echo "== Add to taxon_db"
+    echo Launch python $BIN/create_file_taxondb.py single -gcf "$GENOME_ID" -taxname "$TAXNAME" -r "$DB_URL" -dbName "$TAXONDB_NAME" -fasta "$FASTA" -outdir "$RESDIR"
+    python $BIN/create_file_taxondb.py single -gcf "$GENOME_ID" -taxname "$TAXNAME" -r "$DB_URL" -dbName "$TAXONDB_NAME" -fasta "$FASTA" -outdir "$RESDIR"
+    echo "== Search sgRNA, indexing genome"
+    echo Launch python $BIN/create_metafile.py -file "$FASTA" -rfg "$RESDIR" -taxname "$TAXNAME" -gcf "$GENOME_ID"
+    python $BIN/create_metafile.py -file "$FASTA" -rfg "$RESDIR" -taxname "$TAXNAME" -gcf "$GENOME_ID"
+fi
 
 echo "== Insert sgRNA in database"
 echo Launch python /home/chilpert/Dev/pyCouch/scripts/couchBuild.py --map /home/chilpert/app/motif-broker-2/data/3letter_prefixe_rules.json --data "$RESDIR/genome_pickle" --url "$DB_URL"
@@ -211,9 +204,15 @@ if [[ ! $TEST ]];then
     echo Launch cp $RESDIR/genome_pickle/* /mnt/arwen/mobi/group/databases/crispr/crispr_rc01/pickle/
     cp $RESDIR/genome_pickle/* /mnt/arwen/mobi/group/databases/crispr/crispr_rc01/pickle/
 
+    echo "== Copy fasta to arwen"
+    echo Launch cp $FASTA /mnt/arwen/mobi/group/databases/crispr/crispr_rc01/fasta/
+    cp $FASTA /mnt/arwen/mobi/group/databases/crispr/crispr_rc01/fasta/
+
+elif [[ $TEST ]]; then 
+    echo "== Test version : skip copy to server"
 fi 
 
-echo "Insert taxon in database"
+echo "== Insert taxon in database"
 echo Launch python ~/Dev/pyCouch/scripts/couchBuild.py taxon_db --url "$DB_URL" --data $RESDIR/taxonDB_data
 python /home/chilpert/Dev/pyCouch/scripts/couchBuild.py taxon_db --url "$DB_URL" --data $RESDIR/taxonDB_data
 
@@ -221,6 +220,19 @@ echo "== Recalculate tree"
 echo Launch python $BIN/create_tree.py -url "$DB_URL/" -taxonDB_name "$TAXONDB_NAME" -o "$RESDIR"
 python $BIN/create_tree.py -url "$DB_URL/" -taxonDB_name "$TAXONDB_NAME" -o "$RESDIR"
 
-echo "==Insert tree in database"
+echo "== Insert tree in database"
 echo Launch python ~/Dev/pyCouch/scripts/couchBuild.py $TREE_DB_NAME --url $DB_URL --data $RESDIR/treeDB_data
 python /home/chilpert/Dev/pyCouch/scripts/couchBuild.py $TREE_DB_NAME --url $DB_URL --data $RESDIR/treeDB_data
+
+echo "== Rebuild blast database"
+mkdir $RESDIR/blast_db
+echo Launch bash $BIN/blastDbFolder.sh -i /mnt/arwen/mobi/group/databases/crispr/crispr_rc01/fasta -o $RESDIR/blast_db/big
+bash $BIN/blastDbFolder.sh -i /mnt/arwen/mobi/group/databases/crispr/crispr_rc01/fasta -o $RESDIR/blast_db/big
+
+if [[ $TEST ]]; then 
+    echo "== Test version : skip copy blast db to arwen-dev"
+else 
+    echo "== Copy blast db to arwen-dev"
+    echo Launch cp $RESDIR/blast_db/* /mnt/arwen-dev/data/databases/mobi/crispr_clean 
+    cp $RESDIR/blast_db/* /mnt/arwen-dev/data/databases/mobi/crispr_clean
+fi
