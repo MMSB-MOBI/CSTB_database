@@ -16,7 +16,7 @@ function help() {
 EOF
 }
 
-command -v formatdb >/dev/null 2>&1 || { echo >&2 "formatdb command not found, Exiting"; exit 1; }
+command -v makeblastdb >/dev/null 2>&1 || { echo >&2 "makeblastdb command not found, Exiting"; exit 1; }
 
 POSITIONAL=()
 while [[ $# -gt 0 ]]
@@ -60,19 +60,36 @@ nFasta=$(find $FASTA_INPUT_FOLDER/ -regextype sed -regex ".*\(fna\|fa\|fasta\)$"
 echo "$nFasta fasta files to process"
 nFastaZ=$(find $FASTA_INPUT_FOLDER/ -regextype sed -regex ".*\(fna\|fa\|fasta\)\.gz$" | wc -l)
 echo "$nFastaZ zipped fasta files to process"
-t=$(find ../fasta/ -regextype sed -regex ".*\(fna\|fa\|fasta\)\(\.gz\)\{0,1\}$" | wc -l)
 
-MFASTA=$DATABASE_TAG.mfasta
-find $FASTA_INPUT_FOLDER/ -regextype sed -regex ".*\(fna\|fa\|fasta\)$" | while read f
-    do 
-    cat "$f"
-done > $MFASTA
-find $FASTA_INPUT_FOLDER/ -regextype sed -regex ".*\(fna\|fa\|fasta\)\.gz$" | while read zf
-    do
-    gunzip -c "$zf"
-done >> $MFASTA
+MFASTA=$DATABASE_TAG.fasta
 
-echo "$t genomes content (at least one fasta record each) stored in $MFASTA"
+if [[ $nFasta -ne 0 && $nFastaZ -ne 0 ]]; then
+    echo "A"
+    find $FASTA_INPUT_FOLDER/ -regextype sed -regex ".*\(fna\|fa\|fasta\)$" | while read f
+        do 
+        cat "$f"
+    done > $MFASTA
+
+    find $FASTA_INPUT_FOLDER/ -regextype sed -regex ".*\(fna\|fa\|fasta\)\.gz$" | while read zf
+        do
+        gunzip -c "$zf"
+    done >> $MFASTA
+
+elif [[ $nFasta -ne 0 ]]; then
+    echo "B"
+    find $FASTA_INPUT_FOLDER/ -regextype sed -regex ".*\(fna\|fa\|fasta\)$" | while read f
+        do 
+        cat "$f"
+    done > $MFASTA
+
+elif [[ $nFastaZ -ne 0 ]]; then
+    echo "C"
+    find $FASTA_INPUT_FOLDER/ -regextype sed -regex ".*\(fna\|fa\|fasta\)\.gz$" | while read zf
+        do
+        gunzip -c "$zf"
+    done > $MFASTA
+fi
+
 echo "Formatting as blast database"
-formatdb -t $DATABASE_TAG -i $MFASTA -l ${DATABASE_TAG}_build.log -o T -n $DATABASE_TAG 2>${DATABASE_TAG}_build.err
-gzip $MFASTA
+makeblastdb -in $MFASTA -dbtype nucl 2>${DATABASE_TAG}_build.err > ${DATABASE_TAG}_build.log
+#gzip $MFASTA
