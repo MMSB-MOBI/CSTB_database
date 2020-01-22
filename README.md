@@ -1,5 +1,5 @@
 # CSTB_database
-Scripts to manage CSTB database
+Scripts to manage CSTB database.
 
 ## Check database consistency 
 
